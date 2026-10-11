@@ -1,0 +1,113 @@
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
+-- Remove any existing instance to prevent duplicates
+if CoreGui:FindFirstChild("DraggableLockpickButton") then
+    CoreGui.DraggableLockpickButton:Destroy()
+end
+
+-- Create ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DraggableLockpickButton"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+
+-- Create Draggable Button
+local Button = Instance.new("TextButton")
+Button.Name = "LockpickButton"
+Button.Size = UDim2.new(0, 130, 0, 45)
+Button.Position = UDim2.new(0.5, -65, 0.2, 0)
+Button.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Button.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+Button.TextSize = 15
+Button.Font = Enum.Font.GothamBold
+Button.Text = "Lockpick"
+Button.Parent = ScreenGui
+
+-- Round the corners
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = Button
+
+-- Lockpick Function
+local function triggerLockpick()
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then return end
+    
+    local lockpickingGui = playerGui:FindFirstChild("Lockpicking")
+    if lockpickingGui then
+        local bodyPart = lockpickingGui:FindFirstChild("BodyPart", true)
+        local finishEvent = lockpickingGui:FindFirstChild("FinishEvent", true)
+        
+        if bodyPart and bodyPart.Value and finishEvent then
+            finishEvent:FireServer(bodyPart.Value)
+            task.wait(0.1)
+            lockpickingGui:Destroy()
+            
+            local character = player.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                local hrp = character:FindFirstChild("HumanoidRootPart")
+                if humanoid then
+                    humanoid.WalkSpeed = 16
+                    humanoid.JumpPower = 50
+                end
+                if hrp then
+                    hrp.Anchored = false
+                end
+            end
+            print("Crate unlocked via button!")
+        else
+            print("Lockpicking GUI found, but missing BodyPart or FinishEvent.")
+        end
+    else
+        print("No active 'Lockpicking' GUI found! Open a lockpick first.")
+    end
+end
+
+-- Enhanced Mobile & PC Dragging Logic
+local dragging = false
+local dragStart, startPos
+local totalDistanceMoved = 0
+
+Button.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Button.Position
+        totalDistanceMoved = 0
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        totalDistanceMoved = math.abs(delta.X) + math.abs(delta.Y)
+        
+        Button.Position = UDim2.new(
+            startPos.X.Scale, 
+            startPos.X.Offset + delta.X, 
+            startPos.Y.Scale, 
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Only trigger lockpick if it was a tap (not a drag)
+Button.MouseButton1Click:Connect(function()
+    if totalDistanceMoved < 10 then -- Threshold to prevent accidental activation while dragging
+        triggerLockpick()
+    end
+end)
+
+print("lock-o-picko!")
